@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allergen Alchemist | Molecular Substitution Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Chosen Palette: Lab & Nature - Slate (Neutral), Emerald (Safe/Nature), Indigo (Tech/Data), Rose (Alert/Allergen) -->
+    <!-- Application Structure Plan:
+        1. Header: Branding and core value proposition.
+        2. Control Center (Top): Input field for the 'Allergen' ingredient and 'Exclusion' toggles (The 'Bridge' logic).
+        3. Analysis Dashboard (Middle):
+           - Left: Molecular Breakdown of the target ingredient (Visualizing the 'Problem').
+           - Right: Substitution Engine Results (The 'Solution'). Cards showing best matches based on chemical similarity.
+        4. Recipe Integration (Bottom): Contextual recipes from RecipeDB using the found substitute.
+        5. Developer Console (Overlay/Modal): Explains specific API usage and the logic gap/bridge required.
+    -->
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+        }
+
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .molecule-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+
+    <!-- Navigation / Header -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-2">
+                    <div class="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
+                        A</div>
+                    <span class="font-bold text-xl tracking-tight text-slate-800">Allergen Alchemist</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleDevModal()"
+                        class="text-sm text-indigo-600 hover:text-indigo-800 font-medium bg-indigo-50 px-3 py-1.5 rounded-md transition-colors">
+                        View API Strategy & Bridge
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- Introduction -->
+        <div class="mb-8 max-w-3xl">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Molecular Substitution Engine</h1>
+            <p class="text-slate-600">
+                Enter an ingredient to analyze its chemical flavor profile. The Alchemist will scan FlavorDB for
+                ingredients with matching molecular structures but without the allergenic properties, allowing you to
+                recreate flavors safely.
+            </p>
+        </div>
+
+        <!-- Control Center -->
+        <div class="glass-panel rounded-xl p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                <div class="md:col-span-5">
+                    <label for="ingredientInput" class="block text-sm font-medium text-slate-700 mb-1">Target Ingredient
+                        (Allergen)</label>
+                    <div class="relative">
+                        <input type="text" id="ingredientInput" placeholder="e.g., Peanut, Shrimp, Egg"
+                            class="block w-full rounded-lg border-slate-300 bg-white border py-3 px-4 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            value="Peanut">
+                        <div
+                            class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                            🔍
+                        </div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-5">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Exclusion Filters (The
+                        "Bridge")</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="filter-nuts"
+                            class="filter-btn active bg-rose-100 text-rose-700 border-rose-200 border px-3 py-1.5 rounded-full text-sm font-medium transition"
+                            onclick="toggleFilter(this, 'nuts')">🚫 No Nuts</button>
+                        <button id="filter-seafood"
+                            class="filter-btn bg-slate-100 text-slate-600 border-slate-200 border px-3 py-1.5 rounded-full text-sm font-medium transition"
+                            onclick="toggleFilter(this, 'seafood')">🚫 No Seafood</button>
+                        <button id="filter-dairy"
+                            class="filter-btn bg-slate-100 text-slate-600 border-slate-200 border px-3 py-1.5 rounded-full text-sm font-medium transition"
+                            onclick="toggleFilter(this, 'dairy')">🚫 No Dairy</button>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2">
+                    <button onclick="runAnalysis()"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-transform active:scale-95 flex items-center justify-center gap-2">
+                        <span>Analyze</span>
+                        <span>⚗️</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+
+            <!-- Left: Chemical Analysis -->
+            <div class="flex flex-col gap-6">
+                <!-- Chart Container -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-slate-800">Molecular Flavor Profile</h2>
+                        <span id="molecule-count" class="text-xs font-mono bg-slate-100 px-2 py-1 rounded">0 Molecules
+                            Found</span>
+                    </div>
+                    <p class="text-sm text-slate-500 mb-4">
+                        Visualizing the dominant chemical categories (Esters, Pyrazines, etc.) retrieved from
+                        <strong>FlavorDB</strong>. These compounds define the taste and smell.
+                    </p>
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Top Molecules List -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">Key Flavor Compounds</h3>
+                    <div id="molecule-list" class="flex flex-wrap gap-2">
+                        <!-- Populated by JS -->
+                        <span class="text-sm text-slate-400 italic">Run analysis to see molecules...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Substitution Engine -->
+            <div class="flex flex-col gap-6">
+                <div class="bg-indigo-50 border border-indigo-100 p-6 rounded-xl">
+                    <h2 class="text-lg font-bold text-indigo-900 mb-2">Recommended Substitutes</h2>
+                    <p class="text-sm text-indigo-700 mb-4">
+                        Ingredients identified with high chemical similarity (Jaccard Index) but excluding the selected
+                        allergen categories.
+                    </p>
+
+                    <!-- Results List -->
+                    <div id="substitute-list" class="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2">
+                        <!-- Populated by JS -->
+                        <div class="text-center py-12 text-slate-400">
+                            <div class="text-4xl mb-2">🧪</div>
+                            <p>Ready to synthesize results.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recipe Integration Section -->
+        <div id="recipe-section"
+            class="border-t border-slate-200 pt-12 opacity-50 pointer-events-none transition-all duration-500">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">Culinary Application</h2>
+                    <p class="text-slate-600 mt-1">Real-world recipes from <strong>RecipeDB</strong> using the selected
+                        substitute.</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-sm font-medium text-slate-500 block">Active Substitute</span>
+                    <span id="active-substitute-name" class="text-xl font-bold text-indigo-600">--</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="recipe-grid">
+                <!-- Recipe Cards go here -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Developer Modal (The "Bridge" Explanation) -->
+    <div id="dev-modal"
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-indigo-600">Hackathon Strategy & API Bridge</h3>
+                <button onclick="toggleDevModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+            </div>
+            <div class="p-6 space-y-6">
+
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-4">
+                    <h4 class="font-bold text-amber-800">The "Bridge" You Need to Build</h4>
+                    <p class="text-sm text-amber-700 mt-1">
+                        The APIs provide raw data. The "Bridge" is the <strong>Similarity Algorithm</strong>. FlavorDB
+                        gives you the molecules of Food A. You must write logic (or finding the specific endpoint) to
+                        find Food B that shares those molecules.
+                        <br><br>
+                        <strong>Logic flow for your backend:</strong><br>
+                        1. <code>GET /entities?name=Peanut</code> -> Get ID.<br>
+                        2. <code>GET /entities/{id}/molecules</code> -> Get Molecule List A.<br>
+                        3. (The Bridge) Iterate other foods OR use <code>/entities/{id}/similar</code> (if available and
+                        working) to find overlapping lists.<br>
+                        4. Filter out allergens (e.g., if input is Peanut, remove Legumes).
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-slate-800 mb-2">FlavorDB Endpoints to Use</h4>
+                    <ul class="list-disc pl-5 text-sm text-slate-600 space-y-1">
+                        <li><strong>Search:</strong> <code>{{baseUrl}}/entities?name={query}</code> (To get ID)</li>
+                        <li><strong>Composition:</strong> <code>{{baseUrl}}/entities/{id}/molecules</code> (To get
+                            chemical data)</li>
+                        <li><strong>Golden Endpoint:</strong> <code>{{baseUrl}}/food/by-alias?food_pair={name}</code>
+                            (Try this for pairing/similarity)</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-slate-800 mb-2">RecipeDB Endpoints to Use</h4>
+                    <ul class="list-disc pl-5 text-sm text-slate-600 space-y-1">
+                        <li><strong>Search by Ingredient:</strong>
+                            <code>{{baseUrl}}/recipes/search?ingredient={substitute}</code></li>
+                        <li><strong>Get Recipe Details:</strong> <code>{{baseUrl}}/recipe/{id}</code></li>
+                    </ul>
+                </div>
+
+                <div class="text-xs text-slate-400 italic mt-4">
+                    *This prototype uses mock data because specific API calls require your local network/auth
+                    environment. Uncomment the fetch functions in the source code to connect live.*
+                </div>
+            </div>
+            <div class="p-6 border-t border-slate-100 bg-slate-50 text-right">
+                <button onclick="toggleDevModal()"
+                    class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-900">Got it</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visualization & Content Choices:
+         1. Radar Chart: Best for showing "Flavor Profile" (Sweet, Sour, Salty, Bitter, Umami) or chemical category distribution. It allows instant visual comparison between the allergen and the substitute.
+         2. Cards for Substitutes: Allows displaying the "Match Score" (calculated similarity) and key molecule overlap clearly.
+         3. Dynamic Filtering: Essential for the "Allergen" aspect (removing the harmful group).
+         4. Recipe Grid: Closes the loop for the user, showing practical application.
+         Confirming NO SVG graphics used directly (using Unicode/CSS). NO Mermaid JS used.
+    -->
+
+    <script>
+        // --- State Management ---
+        const state = {
+            currentIngredient: '',
+            filters: {
+                nuts: true, // Default active
+                seafood: false,
+                dairy: false
+            },
+            data: null // Will hold the analysis result
+        };
+
+        // --- Mock Data (Simulating FlavorDB Responses) ---
+        // Since we cannot hit the user's local API, we simulate the structure they will get.
+        const MOCK_DB = {
+            'Peanut': {
+                id: 123,
+                molecules: {
+                    'Pyrazines': 45, // Roasty
+                    'Aldehydes': 30, // Fatty/Green
+                    'Esters': 10,    // Fruity
+                    'Ketones': 15,
+                    'Sulfur': 5
+                },
+                topMolecules: ['2,5-dimethylpyrazine', 'Methional', 'Hexanal'],
+                substitutes: [
+                    { name: 'Sunflower Seeds', category: 'Seed', matchScore: 88, commonMolecules: 12 },
+                    { name: 'Roasted Soybeans', category: 'Legume', matchScore: 82, commonMolecules: 10 },
+                    { name: 'Sesame Seeds', category: 'Seed', matchScore: 76, commonMolecules: 9 },
+                    { name: 'Almond', category: 'Nut', matchScore: 94, commonMolecules: 18 }, // Should be filtered out by "Nut Free"
+                    { name: 'Tahini', category: 'Paste', matchScore: 75, commonMolecules: 8 }
+                ]
+            },
+            'Shrimp': {
+                id: 456,
+                molecules: {
+                    'Amines': 40,    // Fishy
+                    'Esters': 5,
+                    'Aldehydes': 20,
+                    'Sulfur': 35,    // Meaty/Eggy
+                    'Alcohols': 10
+                },
+                topMolecules: ['Trimethylamine', 'Dimethyl sulfide', '1-octen-3-ol'],
+                substitutes: [
+                    { name: 'Konjac', category: 'Plant', matchScore: 65, commonMolecules: 5 },
+                    { name: 'Lobster', category: 'Seafood', matchScore: 98, commonMolecules: 25 }, // Should be filtered
+                    { name: 'King Oyster Mushroom', category: 'Fungi', matchScore: 72, commonMolecules: 8 },
+                    { name: 'Seaweed', category: 'Plant', matchScore: 55, commonMolecules: 6 }
+                ]
+            },
+            'Egg': {
+                id: 789,
+                molecules: {
+                    'Sulfur': 60,
+                    'Ketones': 10,
+                    'Aldehydes': 20,
+                    'Acids': 10
+                },
+                topMolecules: ['Hydrogen sulfide', 'Methanethiol'],
+                substitutes: [
+                    { name: 'Black Salt (Kala Namak)', category: 'Mineral', matchScore: 90, commonMolecules: 2 }, // Sulfur heavy
+                    { name: 'Tofu', category: 'Soy', matchScore: 40, commonMolecules: 4 }, // Textural
+                    { name: 'Aquafaba', category: 'Legume', matchScore: 30, commonMolecules: 3 }
+                ]
+            }
+        };
+
+        const MOCK_RECIPES = {
+            'Sunflower Seeds': [
+                { title: 'Sunflower Seed Pesto Pasta', similarity: '95%', image: '🍝' },
+                { title: 'Crunchy Seed Salad Topper', similarity: '88%', image: '🥗' },
+                { title: 'Sunbutter Cookies', similarity: '92%', image: '🍪' }
+            ],
+            'Roasted Soybeans': [
+                { title: 'Soy Snack Mix', similarity: '85%', image: '🥜' },
+                { title: 'Protein Power Bowl', similarity: '78%', image: '🍲' }
+            ],
+            'King Oyster Mushroom': [
+                { title: 'Vegan "Scallops" in Garlic Sauce', similarity: '91%', image: '🍄' },
+                { title: 'Mushroom Stir Fry', similarity: '84%', image: 'wok' }
+            ]
+        };
+
+        // --- Chart Instance ---
+        let radarChart = null;
+
+        // --- Core Functions ---
+
+        function toggleDevModal() {
+            const modal = document.getElementById('dev-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function toggleFilter(btn, type) {
+            // Toggle UI
+            if (btn.classList.contains('active')) {
+                btn.classList.remove('active', 'bg-rose-100', 'text-rose-700', 'border-rose-200');
+                btn.classList.add('bg-slate-100', 'text-slate-600', 'border-slate-200');
+                state.filters[type] = false;
+            } else {
+                btn.classList.add('active', 'bg-rose-100', 'text-rose-700', 'border-rose-200');
+                btn.classList.remove('bg-slate-100', 'text-slate-600', 'border-slate-200');
+                state.filters[type] = true;
+            }
+
+            // Re-run filter logic if analysis is already done
+            if (state.data) {
+                renderSubstitutes(state.data.substitutes);
+            }
+        }
+
+        async function runAnalysis() {
+            const input = document.getElementById('ingredientInput').value.trim();
+            if (!input) return;
+
+            // 1. Loading State
+            const btn = document.querySelector('button[onclick="runAnalysis()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<span>Scanning FlavorDB...</span>`;
+            btn.disabled = true;
+
+            // 2. Simulate API Call (Replace this with real Fetch in Production)
+            // Implementation for Real API:
+            /*
+            const baseUrl = "http://192.168.1.92:9208/flavordb"; // User's IP
+            try {
+                const searchRes = await fetch(`${baseUrl}/entities?name=${input}`);
+                const searchData = await searchRes.json();
+                const id = searchData[0].id;
+                const molRes = await fetch(`${baseUrl}/entities/${id}/molecules`);
+                // ... process data
+            } catch(e) { console.error("API Error", e); }
+            */
+
+            setTimeout(() => {
+                // Mock Logic
+                let foundKey = Object.keys(MOCK_DB).find(k => k.toLowerCase() === input.toLowerCase());
+
+                // Fallback for demo if unknown ingredient
+                if (!foundKey) foundKey = 'Peanut';
+
+                state.data = MOCK_DB[foundKey];
+                state.currentIngredient = foundKey;
+
+                // Update UI
+                updateChart(state.data.molecules);
+                updateMoleculeList(state.data.topMolecules);
+                renderSubstitutes(state.data.substitutes);
+
+                // Hide recipes until selected
+                document.getElementById('recipe-section').classList.add('opacity-50', 'pointer-events-none');
+
+                // Reset Button
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+
+            }, 800);
+        }
+
+        function updateChart(molecules) {
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            const labels = Object.keys(molecules);
+            const dataValues = Object.values(molecules);
+
+            if (radarChart) radarChart.destroy();
+
+            radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Flavor Chemical Concentration (ppm)',
+                        data: dataValues,
+                        backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                        borderColor: 'rgba(79, 70, 229, 1)',
+                        pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(79, 70, 229, 1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    elements: {
+                        line: { borderWidth: 3 }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: { color: '#e2e8f0' },
+                            grid: { color: '#e2e8f0' },
+                            pointLabels: {
+                                font: { size: 12, family: 'Inter' },
+                                color: '#64748b'
+                            },
+                            ticks: { display: false } // Hide numbers for cleaner look
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // Update Count
+            document.getElementById('molecule-count').innerText = `${Object.values(molecules).reduce((a, b) => a + b, 0)} Units Detected`;
+        }
+
+        function updateMoleculeList(list) {
+            const container = document.getElementById('molecule-list');
+            container.innerHTML = '';
+            list.forEach(mol => {
+                const badge = document.createElement('span');
+                badge.className = 'molecule-badge';
+                badge.innerText = mol;
+                container.appendChild(badge);
+            });
+        }
+
+        function renderSubstitutes(subs) {
+            const container = document.getElementById('substitute-list');
+            container.innerHTML = '';
+
+            // Filter Logic (The "Bridge" implementation)
+            const filteredSubs = subs.filter(sub => {
+                if (state.filters.nuts && (sub.category === 'Nut')) return false;
+                if (state.filters.seafood && (sub.category === 'Seafood')) return false;
+                if (state.filters.dairy && (sub.category === 'Dairy')) return false;
+                return true;
+            });
+
+            if (filteredSubs.length === 0) {
+                container.innerHTML = `<div class="p-4 text-center text-slate-500 text-sm">No substitutes found with current filters. Try relaxing the exclusions.</div>`;
+                return;
+            }
+
+            filteredSubs.forEach(sub => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-lg shadow-sm border border-indigo-50 hover:border-indigo-300 transition-all cursor-pointer group flex justify-between items-center';
+                card.onclick = () => loadRecipes(sub.name);
+
+                const scoreColor = sub.matchScore > 85 ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50';
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                            ${sub.name.charAt(0)}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">${sub.name}</h4>
+                            <span class="text-xs text-slate-400">${sub.category} • ${sub.commonMolecules} Shared Compounds</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="${scoreColor} px-2 py-1 rounded text-xs font-bold mb-1">${sub.matchScore}% Match</div>
+                        <span class="text-xs text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">Find Recipes →</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function loadRecipes(ingredientName) {
+            // Update UI
+            document.getElementById('active-substitute-name').innerText = ingredientName;
+            const section = document.getElementById('recipe-section');
+            section.classList.remove('opacity-50', 'pointer-events-none');
+
+            // Scroll to recipes
+            section.scrollIntoView({ behavior: 'smooth' });
+
+            const grid = document.getElementById('recipe-grid');
+            grid.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-400">Fetching recipes from RecipeDB...</div>`;
+
+            // Simulation of RecipeDB Call
+            /* Real API Call:
+            const rdbUrl = "http://cosylab.iiitd.edu/recipe2-api/recipes/search";
+            const res = await fetch(`${rdbUrl}?ingredient=${ingredientName}`);
+            */
+
+            setTimeout(() => {
+                grid.innerHTML = '';
+                const recipes = MOCK_RECIPES[ingredientName] || [
+                    { title: `Experiment with ${ingredientName}`, similarity: 'N/A', image: '🍲' },
+                    { title: `${ingredientName} Surprise`, similarity: 'N/A', image: '🥣' }
+                ];
+
+                recipes.forEach(r => {
+                    const rCard = document.createElement('div');
+                    rCard.className = 'bg-white rounded-xl shadow border border-slate-100 overflow-hidden hover:shadow-md transition';
+                    rCard.innerHTML = `
+                        <div class="h-32 bg-slate-200 flex items-center justify-center text-4xl">${r.image}</div>
+                        <div class="p-4">
+                            <h5 class="font-bold text-slate-800 mb-1">${r.title}</h5>
+                            <div class="flex justify-between items-center mt-3">
+                                <span class="text-xs text-slate-500">RecipeDB Match</span>
+                                <span class="text-xs font-bold text-indigo-600">${r.similarity}</span>
+                            </div>
+                            <button class="w-full mt-4 bg-slate-800 text-white text-xs py-2 rounded hover:bg-slate-900 transition">View Recipe</button>
+                        </div>
+                    `;
+                    grid.appendChild(rCard);
+                });
+            }, 600);
+        }
+
+        // Initialize with empty chart
+        document.addEventListener('DOMContentLoaded', () => {
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Sweet', 'Sour', 'Salty', 'Bitter', 'Umami'],
+                    datasets: [{
+                        label: 'Baseline',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: 'rgba(203, 213, 225, 0.2)',
+                        borderColor: 'rgba(203, 213, 225, 1)',
+                        pointBackgroundColor: 'transparent',
+                        pointBorderColor: 'transparent'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { r: { ticks: { display: false } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        });
+
+    </script>
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</body>
+
+</html>
